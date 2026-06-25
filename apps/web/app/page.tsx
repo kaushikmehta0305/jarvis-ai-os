@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { CSSProperties, KeyboardEvent } from 'react';
 
 type ChatMessage = {
@@ -8,10 +8,21 @@ type ChatMessage = {
   content: string;
 };
 
+type Memory = {
+  id: string;
+  content: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export default function Home() {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [memoryContent, setMemoryContent] = useState('');
+  const [memories, setMemories] = useState<Memory[]>([]);
+  const [editingMemoryId, setEditingMemoryId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
 
   const sendMessage = async () => {
     const trimmedMessage = message.trim();
@@ -67,6 +78,80 @@ export default function Home() {
       sendMessage();
     }
   };
+
+  const fetchMemories = async () => {
+  try {
+    const response = await fetch('http://localhost:3000/memory');
+    const data = await response.json();
+    setMemories(data);
+  } catch (error) {
+    console.error('Failed to fetch memories:', error);
+  }
+};
+
+const saveMemory = async () => {
+  const trimmedMemory = memoryContent.trim();
+
+  if (!trimmedMemory) return;
+
+  try {
+    await fetch('http://localhost:3000/memory', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ content: trimmedMemory }),
+    });
+
+    setMemoryContent('');
+    fetchMemories();
+  } catch (error) {
+    console.error('Failed to save memory:', error);
+  }
+};
+
+const startEditingMemory = (memory: Memory) => {
+  setEditingMemoryId(memory.id);
+  setEditingContent(memory.content);
+};
+
+const updateMemory = async (id: string) => {
+  const trimmedMemory = editingContent.trim();
+
+  if (!trimmedMemory) return;
+
+  try {
+    await fetch(`http://localhost:3000/memory/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ content: trimmedMemory }),
+    });
+
+    setEditingMemoryId(null);
+    setEditingContent('');
+    fetchMemories();
+  } catch (error) {
+    console.error('Failed to update memory:', error);
+  }
+};
+
+const deleteMemory = async (id: string) => {
+  try {
+    await fetch(`http://localhost:3000/memory/${id}`, {
+      method: 'DELETE',
+    });
+
+    fetchMemories();
+  } catch (error) {
+    console.error('Failed to delete memory:', error);
+  }
+};
+
+useEffect(() => {
+  fetchMemories();
+}, []);
 
   return (
     <main style={styles.page}>
@@ -132,9 +217,82 @@ export default function Home() {
           </button>
         </div>
       </div>
+      <section style={styles.memorySection}>
+  <h2 style={styles.memoryTitle}>Module 2 - Memory Engine MVP</h2>
+  <p style={styles.memoryNote}>Memory is separate from chat for now.</p>
+
+  <div style={styles.memoryInputRow}>
+    <input
+      value={memoryContent}
+      onChange={(event) => setMemoryContent(event.target.value)}
+      placeholder="Write a memory..."
+      style={styles.memoryInput}
+    />
+
+    <button onClick={saveMemory} style={styles.memoryButton}>
+      Save Memory
+    </button>
+  </div>
+
+  <div style={styles.memoryList}>
+    <h3 style={styles.memorySubtitle}>Saved Memories</h3>
+
+    {memories.length === 0 && (
+      <p style={styles.memoryNote}>No memories saved yet.</p>
+    )}
+
+    {memories.map((memory) => (
+      <div key={memory.id} style={styles.memoryCard}>
+        {editingMemoryId === memory.id ? (
+          <>
+            <input
+              value={editingContent}
+              onChange={(event) => setEditingContent(event.target.value)}
+              style={styles.memoryEditInput}
+            />
+
+            <button
+              onClick={() => updateMemory(memory.id)}
+              style={styles.smallButton}
+            >
+              Save
+            </button>
+
+            <button
+              onClick={() => setEditingMemoryId(null)}
+              style={styles.smallButtonSecondary}
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <>
+            <p style={styles.memoryText}>{memory.content}</p>
+
+            <button
+              onClick={() => startEditingMemory(memory)}
+              style={styles.smallButton}
+            >
+              Edit
+            </button>
+
+            <button
+              onClick={() => deleteMemory(memory.id)}
+              style={styles.smallButtonSecondary}
+            >
+              Delete
+            </button>
+          </>
+        )}
+      </div>
+    ))}
+  </div>
+</section>
     </main>
   );
 }
+
+
 
 const styles: Record<string, CSSProperties> = {
   page: {
@@ -234,4 +392,101 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '16px',
     cursor: 'pointer',
   },
+
+  memorySection: {
+  marginTop: '32px',
+  padding: '24px',
+  borderRadius: '16px',
+  border: '1px solid #334155',
+  background: '#111827',
+} satisfies CSSProperties,
+
+memoryTitle: {
+  margin: 0,
+  color: '#ffffff',
+  fontSize: '24px',
+} satisfies CSSProperties,
+
+memoryNote: {
+  color: '#cbd5e1',
+  marginTop: '8px',
+} satisfies CSSProperties,
+
+memoryInputRow: {
+  display: 'flex',
+  gap: '12px',
+  marginTop: '20px',
+} satisfies CSSProperties,
+
+memoryInput: {
+  flex: 1,
+  padding: '14px',
+  borderRadius: '10px',
+  border: '1px solid #475569',
+  background: '#0f172a',
+  color: '#ffffff',
+  fontSize: '16px',
+} satisfies CSSProperties,
+
+memoryButton: {
+  padding: '14px 22px',
+  borderRadius: '10px',
+  border: 'none',
+  background: '#2563eb',
+  color: '#ffffff',
+  cursor: 'pointer',
+  fontSize: '16px',
+} satisfies CSSProperties,
+
+memoryList: {
+  marginTop: '24px',
+} satisfies CSSProperties,
+
+memorySubtitle: {
+  color: '#ffffff',
+  marginBottom: '12px',
+} satisfies CSSProperties,
+
+memoryCard: {
+  padding: '16px',
+  borderRadius: '12px',
+  border: '1px solid #334155',
+  background: '#1e293b',
+  marginBottom: '12px',
+} satisfies CSSProperties,
+
+memoryText: {
+  color: '#ffffff',
+  marginBottom: '12px',
+} satisfies CSSProperties,
+
+memoryEditInput: {
+  width: '100%',
+  padding: '12px',
+  borderRadius: '8px',
+  border: '1px solid #475569',
+  background: '#0f172a',
+  color: '#ffffff',
+  marginBottom: '12px',
+} satisfies CSSProperties,
+
+smallButton: {
+  padding: '8px 14px',
+  borderRadius: '8px',
+  border: 'none',
+  background: '#2563eb',
+  color: '#ffffff',
+  cursor: 'pointer',
+  marginRight: '8px',
+} satisfies CSSProperties,
+
+smallButtonSecondary: {
+  padding: '8px 14px',
+  borderRadius: '8px',
+  border: '1px solid #64748b',
+  background: 'transparent',
+  color: '#ffffff',
+  cursor: 'pointer',
+} satisfies CSSProperties,
 };
+
