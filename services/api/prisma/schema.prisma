@@ -1,0 +1,25 @@
+generator client {
+  provider     = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Memory {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("memories")
+}
+
+model Provider {
+  id        String   @id @default(cuid())
+  name      String
+  apiKey    String   @map("api_key")
+  baseUrl   String?  @map("base_url")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("providers")
+}
